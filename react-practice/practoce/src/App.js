@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import Windy from './utils/windy';
 import data from './gfs';
 
-mapboxgl.accessToken = 'pk.eyJ1IjoiZW5ncmtpIiwiYSI6ImNrc29yeHB2aDBieDEydXFoY240bXExcWoifQ.WS7GVtVGZb4xgHn9dleszQ';
+mapboxgl.accessToken = 'Token';
 
 export default function Mapbox() {
   const mapContainer = useRef(null);
@@ -11,10 +11,31 @@ export default function Mapbox() {
   const map = useRef(null);
   let windy = useRef(null);
 
+  // Helper function to calculate particle width based on zoom level
+  function calculateParticleWidth(zoomLevel) {
+    let particleWidth = 0.8;
+    if (zoomLevel > 2) particleWidth = 0.6;
+    if (zoomLevel > 3) particleWidth = 0.4;
+    if (zoomLevel > 4) particleWidth = 0.2;
+    if (zoomLevel > 5) particleWidth = 0.07;
+    if (zoomLevel > 6) particleWidth = 0.05;
+    return particleWidth;
+  }
+
+  // Function to reset the wind visualization
   const resetWind = useCallback(() => {
     if (windy.current) {
       const { width, height } = map.current.getCanvas().getBoundingClientRect();
-      const { north, south, west, east } = map.current.getBounds();
+      const bounds = map.current.getBounds();
+      const { north, south, west, east } = bounds;
+
+      console.log('Resetting wind with bounds:', bounds);
+
+      if (north === undefined || south === undefined || west === undefined || east === undefined) {
+        console.error('Bounds are undefined:', bounds);
+        return;
+      }
+
       const particleWidth = calculateParticleWidth(map.current.getZoom());
 
       windy.current.stop();
@@ -28,19 +49,10 @@ export default function Mapbox() {
     }
   }, []);
 
-  function calculateParticleWidth(zoomLevel) {
-    let particleWidth = 0.8;
-    if (zoomLevel > 2) particleWidth = 0.6;
-    if (zoomLevel > 3) particleWidth = 0.4;
-    if (zoomLevel > 4) particleWidth = 0.2;
-    if (zoomLevel > 5) particleWidth = 0.07;
-    if (zoomLevel > 6) particleWidth = 0.05;
-    return particleWidth;
-  }
-
+  // Initialize Mapbox map and set up event listeners
   useEffect(() => {
     if (map.current) return;
-    
+
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/navigation-night-v1',
@@ -70,8 +82,8 @@ export default function Mapbox() {
         },
       });
 
+      // Initialize Windy after a delay to ensure map is fully loaded
       const timeoutId = setTimeout(() => {
-        console.log('Code executed after 2 seconds');
         if (canvasRef.current) {
           windy.current = new Windy({ canvas: canvasRef.current, data: data });
           resetWind();
@@ -81,11 +93,12 @@ export default function Mapbox() {
       return () => clearTimeout(timeoutId);
     });
 
+    // Set up event listeners for resizing, moving, and zooming the map
     map.current.on('resize', resetWind);
     map.current.on('move', resetWind);
     map.current.on('zoom', resetWind);
 
-  }, [resetWind, canvasRef]);
+  }, [resetWind]);
 
   return (
     <div>
